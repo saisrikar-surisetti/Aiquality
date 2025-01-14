@@ -5,18 +5,45 @@ const client = new Retell({
   apiKey: process.env.RETELL_API_KEY!,
 });
 
-const AGENT_PROMPT = `You are a friendly assistant calling about car service.
+function generatePrompt(carModel: string, dealership: string, timezone: string) {
+  return `You are a friendly assistant calling about car service for a toyota 2019.
+
+
 Your goals:
-1. Get the oil change price
-2. Get earliest available appointment
-3. Get service hours
+1. Get the oil change price for the the car
+2. Get earliest available appointment (make sure to confirm the timezone)
+3. Get service hours (make sure to confirm the timezone)
+
+Important tracking requirements:
+- Note if someone picks up the call
+- Track how long you're put on hold (if at all)
+- Track which pieces of information you successfully collect
 
 Keep responses brief and natural. End the call once you have all information.
-Do not mention that you are an AI.`;
+Do not mention that you are an AI.
+
+At the end of the call, you must provide a JSON summary in this format:
+{
+  "goals": {
+    "oilChangePrice": { "completed": true/false, "value": "price if obtained" },
+    "earliestAppointment": { "completed": true/false, "value": "date/time if obtained" },
+    "serviceHours": { "completed": true/false, "value": "hours if obtained" }
+  },
+  "metrics": {
+    "pickupSuccess": true/false,
+    "holdTime": number_of_seconds,
+    "informationCollected": {
+      "oilChangePrice": true/false,
+      "earliestAppointment": true/false,
+      "serviceHours": true/false
+    }
+  }
+}`;
+}
 
 export async function POST(request: Request) {
   try {
-    const { phoneNumber, carModel } = await request.json();
+    const { phoneNumber, carModel, dealership, timezone } = await request.json();
     
     if (!process.env.RETELL_API_KEY) {
       throw new Error('Retell API key is not configured');
@@ -30,12 +57,17 @@ export async function POST(request: Request) {
       throw new Error('Phone number is required');
     }
 
+    if (!carModel) {
+      throw new Error('Car model is required');
+    }
+
     // Format phone number to E.164 format if needed
     const formattedPhone = phoneNumber.startsWith('+') ? phoneNumber : `+1${phoneNumber.replace(/\D/g, '')}`;
     
     console.log('Creating call with:', {
       from: process.env.RETELL_PHONE_NUMBER,
-      to: formattedPhone
+      to: formattedPhone,
+      carModel: carModel
     });
 
     const call = await client.call.createPhoneCall({
@@ -43,7 +75,7 @@ export async function POST(request: Request) {
       to_number: formattedPhone,
       llm: {
         model: "gpt-4",
-        prompt: AGENT_PROMPT
+        prompt: generatePrompt(carModel, dealership, timezone)
       },
       voice: {
         provider: "11labs",
