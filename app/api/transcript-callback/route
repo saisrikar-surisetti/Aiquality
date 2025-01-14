@@ -1,0 +1,18 @@
+import { NextResponse } from 'next/server';
+
+export async function POST(request: Request) {
+  try {
+    const formData = await request.formData();
+    const transcriptionText = formData.get('TranscriptionText');
+    const callSid = formData.get('CallSid');
+    
+    console.log('Received transcript:', { callSid, transcriptionText });
+    
+    // Here you would typically store this in a database
+    // For now, we'll just return a success response to Twilio
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Transcript webhook error:', error);
+    return NextResponse.json({ success: false }, { status: 500 });
+  }
+}
